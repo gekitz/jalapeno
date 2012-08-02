@@ -20,39 +20,49 @@ var dest_folder = argv[3];
 
 watch.watchTree(watch_folder, function (f, curr, prev) {
     if (typeof f == "object" && prev === null && curr === null) {
+        
         // Finished walking the tree
         console.log('finished walking tree');
+        
     } else if (prev === null) {
+        
         // f is a new file
         console.log('new file: ' + f);
-        if (isDirectory(f)){
-            //check if directory exists copy it if not
+        var real_save_path = realDestinationPath(f, watch_folder, dest_folder);
+        if (isDirectory(f, false)){
+            //check if directory exists, if not create it
+            isDirectory(real_save_path, true); 
         } else{
             //it's a file so let's copy it
-            copyFileFrom(f, dest_folder);
+            copyFileFrom(f, real_save_path);
         }
 
     } else if (curr.nlink === 0) {
+        
         // f was removed
         console.log('removed file');
-        if (isDirectory(f)){
+        if (isDirectory(f, false)){
             
         } else{
             removeFileAtPath(f, dest_folder);   
         }
     } else {
+        
         // f was changed
         console.log('changed file f: ' + f);
-        if (isDirectory(f)){
-            //check if directory exists copy it if not
+        var real_save_path = realDestinationPath(f, watch_folder, dest_folder);
+        
+        if (isDirectory(f, false)){
+            //check if directory exists, if not create it
+            isDirectory(real_save_path, true); 
         } else{
             //it's a file so let's copy it
-            copyFileFrom(f, dest_folder);
+            copyFileFrom(f, real_save_path);
         }
     }
 });
 
-function isDirectory(file_to_copy){
+function isDirectory(file_to_copy, create_if_not_there){
     var fs = require('fs');
     try {
         // Query the entry
@@ -67,7 +77,18 @@ function isDirectory(file_to_copy){
         }
     }
     catch (e) {
-        // ...
+        
+        if (create_if_not_there){
+            var mkdirp = require('mkdirp');
+            
+            mkdirp(file_to_copy, function (err) {
+                if (err) 
+                    console.error(err)
+                else 
+                    console.log('Created Dir at path', file_to_copy);
+            });
+        }
+        
     }
     
     return false;
@@ -83,15 +104,19 @@ function copyFileFrom(file, to_dir){
         return;
     }
 
-    console.log("\n");
-    console.log("Copying File: " + file_name);
-
-    sys.pump(fs.createReadStream(file), fs.createWriteStream(to_dir + file_name),function(){
+    sys.pump(fs.createReadStream(file), fs.createWriteStream(to_dir),function(){
         console.log("Copied file: " + file);
-        console.log("To new destination: " + to_dir + file_name + "\n");
+        console.log("To new destination: " + to_dir + "\n");
     });
 };
 
+//create the real dest path with intermediate dirs
+function realDestinationPath(file, from_dir, to_dir)
+{
+    var length = from_dir.length;
+    var from_dir_path = file.substring(length + 1, file.length);
+    return to_dir + from_dir_path;
+}
 
 //remove files at dest path
 function removeFileAtPath(file, to_dir){
