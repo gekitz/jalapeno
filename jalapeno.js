@@ -3,29 +3,58 @@
 //
 //  Created by Georg Kitz on 8/2/12.
 //  Copyright (c) 2012 Aurora Apps. All rights reserved.
-
-var watch = require('watch');
-
 var argv = process.argv;
 var value = argv[2];
 
 if (value == '-help' || argv.length != 4) {
-    console.log('Use the script like this\n');
+    console.log('\nUse the script like this\n');
+    console.log('For a single file use:');
     console.log('node jalapeno.js <absolute_path_to_watch> <absolute_path_to_copy_changed_files>\n'); 
+    console.log('For a multiple files use:');
+    console.log('node jalapeno.js -list <absolute_path_to_json_file>\n');
+    console.log('For a sample file, checkout http://github.com/gekitz/jalapeno\n');
     return;
 };
 
-var watch_folder = value;
-var dest_folder = argv[3];
+if (value == '-list') {
 
-watch.watchTree(watch_folder, function (f, curr, prev) {
-    if (typeof f == "object" && prev === null && curr === null) {
-        
+    path_to_file = argv[3];
+
+    fs = require('fs');
+    fs.readFile(path_to_file, 'utf-8', function(error, data){
+
+        if (error) {
+            return console.log("Couldn't load json file at path: " + path_to_file);
+        };
+
+        var parsed_object = JSON.parse(data);
+        console.log(parsed_object);
+
+        for (var i = parsed_object.length - 1; i >= 0; i--) {
+            startWatching(parsed_object[i].src, parsed_object[i].dest);
+        };
+
+    });
+
+} else {
+    var watch_folder = value;
+    var dest_folder = argv[3];
+
+    startWatching(watch_folder, dest_folder);
+}
+
+//functions
+function startWatching(watch_folder, dest_folder){
+
+    var watch = require('watch');
+    watch.watchTree(watch_folder, function (f, curr, prev) {
+        if (typeof f == "object" && prev === null && curr === null) {
+
         // Finished walking the tree
         console.log('finished walking tree');
         
     } else if (prev === null) {
-        
+
         // f is a new file
         console.log('new file: ' + f);
         var real_save_path = realDestinationPath(f, watch_folder, dest_folder);
@@ -38,16 +67,16 @@ watch.watchTree(watch_folder, function (f, curr, prev) {
         }
 
     } else if (curr.nlink === 0) {
-        
+
         // f was removed
         console.log('removed file');
         if (isDirectory(f, false)){
-            
+
         } else{
             removeFileAtPath(f, dest_folder);   
         }
     } else {
-        
+
         // f was changed
         console.log('changed file f: ' + f);
         var real_save_path = realDestinationPath(f, watch_folder, dest_folder);
@@ -60,7 +89,8 @@ watch.watchTree(watch_folder, function (f, curr, prev) {
             copyFileFrom(f, real_save_path);
         }
     }
-});
+    });
+}
 
 function isDirectory(file_to_copy, create_if_not_there){
     var fs = require('fs');
@@ -114,7 +144,7 @@ function copyFileFrom(file, to_dir){
 function realDestinationPath(file, from_dir, to_dir)
 {
     var length = from_dir.length;
-    var from_dir_path = file.substring(length + 1, file.length);
+    var from_dir_path = file.substring(length, file.length);
     return to_dir + from_dir_path;
 }
 
